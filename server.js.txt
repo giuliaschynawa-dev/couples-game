@@ -1,0 +1,120 @@
+// server.js
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
+
+// ===========================================================================================
+//                                      QUESTION DATABASE (SERVER-SIDE)
+// ===========================================================================================
+const extremeSpicyQuestions = [
+    "What's the kinkiest fantasy you've ever had?", "Describe the most forbidden sexual thought you've had about your partner.", "What's one thing you'd love to try in a private setting that you've only fantasized about?", "What's your most intense sexual turn-on?", "Describe a time you'd like to be sexually dominant or submissive with your partner.", "What's the naughtiest public place you'd love to be intimate with your partner?", "What's your biggest turn-off in a sexual encounter?", "Have you ever had a sexual dream about your partner? Tell them what happened.", "What's a sexual taboo you've always wanted to explore?", "What's a secret fetish you have?", "How do you feel about BDSM? What aspects intrigue you?", "Describe how you'd like to use a sex toy with your partner.", "What's the most extreme thing you'd love to do for pleasure?", "What's the most surprising place you'd love to have sex?", "Would you ever try a threesome? If so, with whom?", "What's a sexual fantasy you're too embarrassed to admit to your partner?", "Would you like to explore submission with your partner? How do you think it would feel?", "What's your favorite position and why?", "What kind of dirty talk do you like to hear?", "What is your fantasy involving more than one person?", "What's your ultimate fantasy role-playing scenario?", "What's the most seductive thing you'd love to say or do?", "Describe your ideal sexual partner in detail.", "What's the most adventurous thing you'd love to do in bed?", "What's a secret desire or fantasy that feels a bit forbidden?", "What's a sexual experience you've always wanted to have?", "What's the biggest sexual risk you would love to take?", "What's your most sensitive erogenous zone?", "Do you prefer giving or receiving oral sex?", "Have you ever been aroused by a non-sexual situation?", "What's a sexual fantasy you'd be willing to share with a partner?", "Describe your ideal night of intimate pleasure.", "What's the most daring text message you'd love to send?", "Would you like to experiment with handcuffs or other restraints?", "What's your favorite kind of foreplay?", "What's the hottest place you'd love to be kissed?", "Have you ever fantasized about a celebrity?", "What's the most inappropriate thought you've had about a friend?", "What's a boundary or limit that you are curious about exploring?", "What's a sexual memory you'd love to create with your partner?", "Describe a sexual scenario that you find a bit silly but are still curious about.", "What's a new sexual position you want to try?", "Have you ever had a crush on a teacher or someone in a position of authority?", "What's a turn-on you didn't know you had until recently?", "Would you be open to recording a sexual act with your partner?", "What's your favorite part of your partner's body to touch?", "Would you be open to being spanked? What do you think it would be like?", "What's a fantasy involving food or drink?", "What's a secret you'd love to share with your partner?", "What's the wildest place you'd love to have sex?", "What's the most spontaneous sexual scenario you've ever imagined?", "What's your opinion on open relationships or polyamory?", "What's the hottest thing you'd love to see someone do?", "Describe a group fantasy you're curious about.", "What's a sexual boundary you'd never cross?", "Describe a fantasy involving public exhibitionism.", "What's your go-to sexy song or playlist?", "Have you ever pretended to be someone else for a fantasy?", "What is the most daring photo you'd like to take and send to your partner?", "What's a sexual request you'd love to make?",
+];
+
+const spicyDares = [
+    "Take off your pants and send a photo to your partner (from the waist up).", "Describe what you are wearing right now, in a sexy way.", "Go to your private photos and send the most daring picture you have to your partner.", "Take a picture of yourself from the waist down and send it to your partner.", "Send a video of you touching yourself for 10 seconds. You don't have to show your face.", "Take off your underwear and describe how it feels to your partner.", "Send a picture of your bedroom from your bed. Get creative.", "Send a video of you slowly taking off your shirt.", "Send a picture of your chest to your partner.", "Take a full-body mirror selfie without any clothes on and send it to your partner.", "Tell your partner a new, sexy secret.", "Send a picture of yourself touching a specific body part and tell your partner what it is.", "Send a picture of your underwear on your floor.", "Record a 15-second video of yourself dancing to a sexy song.", "Send a video of you biting your lip and winking at the camera.", "Find a sexy outfit in your closet, try it on, and send a photo to your partner.", "Send a picture of your feet.", "Send a picture of yourself with no shirt on. Get creative with the angles.", "Record a short video of you whispering a dirty secret to your partner.", "Send a picture of your butt to your partner.", "Send a picture of yourself in a new, daring pose.", "Go to a window, open the blinds, and take a selfie.", "Tell your partner what you'd do to them right now.", "Record a video of you slowly taking off your shirt, then putting it back on.", "Send a picture of you biting a fruit in a suggestive way.", "Go to your gallery and send the last daring picture you took.", "Tell your partner 'I'm feeling naughty tonight' in a text message.", "Send a picture of your legs.", "Record a video of you giving yourself a flirty wink.", "Send a picture of your favorite piece of lingerie or underwear to your partner.", "Send a picture of your back, showing off a bit of skin.", "Send a picture of yourself with a pillow covering your chest.", "Tell your partner about a fantasy you just had.", "Send a picture of your favorite part of your body.", "Send a picture of your shoulders and neck.", "Send a picture of your lips.", "Tell your partner your biggest turn-on in a text message.", "Describe a kinky thought you had this week.", "Send a photo of yourself in a position you find sexy.", "Describe what you would do to your partner if you were in the same room right now."
+];
+
+const WILD_CARD_CHANCE = 0.10;
+const NUM_WILDCARD_OPTIONS = 5;
+
+// ===========================================================================================
+//                                        GAME LOGIC (SERVER-SIDE)
+// ===========================================================================================
+let games = {};
+
+function getRandomCard() {
+    const allSpicyCards = [...extremeSpicyQuestions, ...spicyDares];
+    const randomIndex = Math.floor(Math.random() * allSpicyCards.length);
+    const text = allSpicyCards[randomIndex];
+    const category = extremeSpicyQuestions.includes(text) ? 'spicy-question' : 'spicy-dare';
+    return { text, category };
+}
+
+io.on('connection', (socket) => {
+    console.log('A user connected:', socket.id);
+
+    socket.on('createGame', () => {
+        const gameId = Math.random().toString(36).substring(2, 7).toUpperCase();
+        games[gameId] = {
+            players: [socket.id],
+            currentPlayer: 0,
+            cardData: {
+                text: 'Waiting for player 2...',
+                category: ''
+            }
+        };
+        socket.join(gameId);
+        socket.emit('gameCreated', gameId);
+        console.log(`Game created with ID: ${gameId}`);
+    });
+
+    socket.on('joinGame', (gameId) => {
+        if (games[gameId] && games[gameId].players.length < 2) {
+            games[gameId].players.push(socket.id);
+            socket.join(gameId);
+            io.to(gameId).emit('playerJoined');
+            console.log(`Player joined game: ${gameId}`);
+            
+            // Start the game by drawing the first card
+            const newCard = getRandomCard();
+            games[gameId].cardData = newCard;
+            io.to(gameId).emit('updateGameState', games[gameId]);
+        } else {
+            socket.emit('error', 'Game not found or is full.');
+        }
+    });
+
+    socket.on('nextCard', (gameId) => {
+        if (games[gameId]) {
+            const nextPlayer = (games[gameId].currentPlayer + 1) % games[gameId].players.length;
+            games[gameId].currentPlayer = nextPlayer;
+
+            const isWildcard = Math.random() < WILD_CARD_CHANCE;
+            if (isWildcard) {
+                const wildcardOptions = [];
+                wildcardOptions.push({ text: 'Freie Karte', category: 'free-card' });
+                const tempPool = [...extremeSpicyQuestions, ...spicyDares];
+                for (let i = 0; i < NUM_WILDCARD_OPTIONS; i++) {
+                    const randomIndex = Math.floor(Math.random() * tempPool.length);
+                    const text = tempPool[randomIndex];
+                    const category = extremeSpicyQuestions.includes(text) ? 'spicy-question' : 'spicy-dare';
+                    wildcardOptions.push({ text, category });
+                    tempPool.splice(randomIndex, 1);
+                }
+                io.to(gameId).emit('showWildcardOptions', { options: wildcardOptions, currentPlayer: nextPlayer });
+            } else {
+                const newCard = getRandomCard();
+                games[gameId].cardData = newCard;
+                io.to(gameId).emit('updateGameState', games[gameId]);
+            }
+        }
+    });
+
+    socket.on('chooseWildcardCard', (data) => {
+        if (games[data.gameId]) {
+            games[data.gameId].cardData = data.card;
+            io.to(data.gameId).emit('updateGameState', games[data.gameId]);
+        }
+    });
+    
+    socket.on('disconnect', () => {
+        console.log('A user disconnected:', socket.id);
+        for (const gameId in games) {
+            games[gameId].players = games[gameId].players.filter(id => id !== socket.id);
+            if (games[gameId].players.length === 0) {
+                delete games[gameId];
+                console.log(`Game ${gameId} deleted`);
+            }
+        }
+    });
+});
+
+app.use(express.static('public'));
+
+server.listen(3000, () => {
+    console.log('Server is running on http://localhost:3000');
+});
