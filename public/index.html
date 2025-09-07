@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Couple's Game</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            text-align: center;
+            margin: 50px;
+            background-color: #f8f8f8;
+            color: #333;
+            perspective: 1000px;
+        }
+        h1 {
+            color: #d6336c;
+            font-size: 2.5em;
+            font-weight: 700;
+        }
+        p {
+            font-size: 1.1em;
+            margin: 20px auto;
+            max-width: 600px;
+        }
+        .button {
+            padding: 15px 30px;
+            margin: 10px;
+            font-size: 1.1em;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            transition: transform 0.2s ease-in-out;
+        }
+        .button:hover {
+            transform: translateY(-3px);
+        }
+        .normal {
+            background-color: #4CAF50;
+        }
+        .extreme-spicy {
+            background-color: #e74c3c;
+        }
+        #startMenu {
+            display: block;
+            margin-top: 50px;
+        }
+        #playerInput {
+            margin-bottom: 20px;
+        }
+        #playerInput input {
+            padding: 10px;
+            font-size: 1em;
+            margin: 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        #gameArea {
+            display: none;
+            margin-top: 40px;
+            padding: 25px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            max-width: 700px;
+            margin: 40px auto;
+        }
+        #playerDisplay {
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #d6336c;
+        }
+        .card-container {
+            width: 90%;
+            height: 450px;
+            margin: 40px auto;
+            position: relative;
+        }
+        .card {
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+            position: relative;
+            cursor: pointer;
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        .card.is-flipped {
+            transform: rotateY(180deg);
+        }
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 15px;
+            overflow: hidden;
+            color: white;
+            font-size: 1.5em;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .card-front {
+            background-color: #d6336c;
+            flex-direction: column;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+        .card-back {
+            background-color: #4CAF50;
+            transform: rotateY(180deg);
+            color: black;
+            font-size: 1.3em;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            line-height: 1.5;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        .category-text {
+            font-size: 2em;
+            font-weight: bold;
+            text-transform: uppercase;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            position: absolute;
+            left: 10px;
+            bottom: 20px;
+            font-size: 1.2em;
+            letter-spacing: 2px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        .card-front .category-text {
+            color: rgba(255, 255, 255, 0.8);
+        }
+        /* Category-specific colors */
+        .card.spicy-question { background-color: #d35400; }
+        .card.spicy-dare { background-color: #c0392b; }
+        .card.wildcard { background-color: #000; }
+        .card.wildcard .card-back { background-color: #2c3e50; color: white; }
+        .card.free-card { background-color: #8e44ad; }
+        
+        .card.spicy-question .card-back { background-color: #d35400; }
+        .card.spicy-dare .card-back { background-color: #c0392b; }
+        .card.free-card .card-back { background-color: #9b59b6; }
+        
+        #buttonContainer {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        #wildcard-options-container {
+            display: none;
+            margin-top: 20px;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .wildcard-option-card {
+            width: 180px;
+            height: 250px;
+            position: relative;
+            transform-style: preserve-3d;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease-in-out;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 1.1em;
+            padding: 10px;
+            box-sizing: border-box;
+            color: white;
+            font-weight: 600;
+        }
+        .wildcard-option-card:hover {
+            transform: translateY(-5px);
+        }
+        .wildcard-option-card.spicy-question { background-color: #d35400; }
+        .wildcard-option-card.spicy-dare { background-color: #c0392b; }
+        .wildcard-option-card.free-card { background-color: #9b59b6; }
+        #free-card-input-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+            gap: 10px;
+        }
+        #free-card-input-container input {
+            padding: 10px;
+            width: 90%;
+            max-width: 400px;
+            font-size: 1em;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        #free-card-input-container button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Couple's Game</h1>
+    <p>Welcome to the Couple's Game! Choose your edition and discover new things about each other. This game is perfect for getting to know each other better, whether you are together or playing remotely on your phones.</p>
+
+    <div id="startMenu">
+        <button class="button extreme-spicy" onclick="createGame()">Create Game</button>
+        <div id="joinInput" style="display:none; margin-top:20px;">
+            <input type="text" id="gameIdInput" placeholder="Enter Game ID">
+            <button class="button normal" onclick="joinGame()">Join Game</button>
+        </div>
+        <button class="button normal" onclick="showJoinInput()">Join Game</button>
+    </div>
+
+    <div id="gameArea">
+        <div id="playerDisplay"></div>
+        <div id="wildcard-main-container">
+            <div class="card-container">
+                <div id="card" class="card" onclick="flipCard()">
+                    <div id="cardFront" class="card-face card-front">
+                        <h2>Click to Reveal</h2>
+                    </div>
+                    <div id="cardBack" class="card-face card-back">
+                        <p id="questionBox"></p>
+                    </div>
+                </div>
+            </div>
+            <div id="buttonContainer">
+                <button id="nextButton" onclick="requestNextCard()">Next Card</button>
+            </div>
+        </div>
+        
+        <div id="wildcard-options-container"></div>
+        <div id="free-card-input-container">
+            <h3>Type your own card text below:</h3>
+            <input type="text" id="freeCardText" placeholder="Your custom question or dare">
+            <button onclick="submitFreeCard()">Confirm</button>
+        </div>
+        
+        <div id="waitingScreen" style="display:none; margin-top: 50px;">
+            <h2>Waiting for your partner...</h2>
+            <p>Your Game ID is: <span id="gameIdDisplay" style="font-weight:bold;"></span></p>
+        </div>
+    </div>
+
+    <script>
+const socket = io();
+let gameId = null;
+let myPlayerIndex = -1;
+
+const card = document.getElementById('card');
+const questionBox = document.getElementById('questionBox');
+const cardFront = document.getElementById('cardFront');
+const mainGameContainer = document.getElementById('wildcard-main-container');
+const wildcardOptionsContainer = document.getElementById('wildcard-options-container');
+const freeCardInputContainer = document.getElementById('free-card-input-container');
+const nextButton = document.getElementById('nextButton');
+
+function showJoinInput() {
+    document.getElementById('joinInput').style.display = 'block';
+}
+
+function createGame() {
+    socket.emit('createGame');
+    document.getElementById('startMenu').style.display = 'none';
+    document.getElementById('gameArea').style.display = 'block';
+    document.getElementById('waitingScreen').style.display = 'block';
+    myPlayerIndex = 0;
+}
+
+function joinGame() {
+    const gameIdInput = document.getElementById('gameIdInput').value.toUpperCase();
+    if (gameIdInput) {
+        gameId = gameIdInput;
+        socket.emit('joinGame', gameId);
+        document.getElementById('startMenu').style.display = 'none';
+        document.getElementById('gameArea').style.display = 'block';
+        myPlayerIndex = 1;
+    }
+}
+
+function requestNextCard() {
+    socket.emit('nextCard', gameId);
+}
+
+function flipCard() {
+    card.classList.add('is-flipped');
+}
+
+function updateGameDisplay(data) {
+    const { cardData, currentPlayer, players } = data;
+    const playerNames = ['Player 1', 'Player 2'];
+
+    card.classList.remove('is-flipped');
+    
+    wildcardOptionsContainer.style.display = 'none';
+    freeCardInputContainer.style.display = 'none';
+    mainGameContainer.style.display = 'block';
+
+    card.classList.remove('spicy-question', 'spicy-dare', 'wildcard', 'free-card');
+
+    if (cardData.category) {
+        card.classList.add(cardData.category);
+    }
+    questionBox.innerText = cardData.text;
+
+    const categoryTextElement = document.createElement('div');
+    categoryTextElement.classList.add('category-text');
+    categoryTextElement.innerText = cardData.category.replace('-', ' ').toUpperCase();
+    cardFront.innerHTML = '';
+    cardFront.appendChild(categoryTextElement);
+
+    const currentPlayerName = playerNames[currentPlayer];
+    document.getElementById('playerDisplay').innerText = `It's ${currentPlayerName}'s turn!`;
+    
+    if (players[currentPlayer] === socket.id) {
+        nextButton.disabled = false;
+        nextButton.style.opacity = 1;
+    } else {
+        nextButton.disabled = true;
+        nextButton.style.opacity = 0.5;
+    }
+}
+
+function showWildcardOptions(data) {
+    const { options, currentPlayer, players } = data;
+    
+    if (players[currentPlayer] !== socket.id) {
+        document.getElementById('playerDisplay').innerText = `Waiting for your partner to choose a card.`;
+        return;
+    }
+
+    wildcardOptionsContainer.innerHTML = '';
+    
+    mainGameContainer.style.display = 'none';
+    wildcardOptionsContainer.style.display = 'flex';
+    document.getElementById('playerDisplay').innerText = `Wildcard! Choose your card.`;
+
+    options.forEach(option => {
+        const optionDiv = document.createElement('div');
+        optionDiv.className = `wildcard-option-card ${option.category}`;
+        optionDiv.innerText = option.category === 'spicy-question' ? "Spicy Question" : (option.category === 'spicy-dare' ? "Spicy Dare" : "Freie Karte");
+        optionDiv.onclick = () => {
+            if (option.category === 'free-card') {
+                wildcardOptionsContainer.style.display = 'none';
+                freeCardInputContainer.style.display = 'flex';
+            } else {
+                socket.emit('chooseWildcardCard', { gameId, card: option });
+            }
+        };
+        wildcardOptionsContainer.appendChild(optionDiv);
+    });
+}
+
+function submitFreeCard() {
+    const text = document.getElementById('freeCardText').value.trim();
+    if (text === "") {
+        alert("Please enter some text for your card.");
+        return;
+    }
+    const cardData = {
+        text: text,
+        category: 'free-card'
+    };
+    socket.emit('chooseWildcardCard', { gameId, card: cardData });
+}
+
+// ===========================================================================================
+//                                        SOCKET.IO EVENTS
+// ===========================================================================================
+socket.on('gameCreated', (id) => {
+    gameId = id;
+    document.getElementById('gameIdDisplay').innerText = gameId;
+});
+
+socket.on('playerJoined', () => {
+    document.getElementById('waitingScreen').style.display = 'none';
+    document.getElementById('playerDisplay').innerText = `Game started!`;
+});
+
+socket.on('updateGameState', (data) => {
+    updateGameDisplay(data);
+});
+
+socket.on('showWildcardOptions', (data) => {
+    showWildcardOptions(data);
+});
+
+socket.on('error', (message) => {
+    alert(message);
+    window.location.reload();
+});
+
+    </script>
+</body>
+</html>
